@@ -4,37 +4,36 @@
 # ------------------------------------------------------------------------------
 # หมายเหตุสำคัญ (โปรดอ่านก่อนใช้งาน):
 #   ไฟล์โมเดล .pkcls ทั้ง 3 ไฟล์ที่แนบมา (Logistic Regression, Neural Network,
-#   Decision Tree) ถูกฝึกและบันทึกด้วยโปรแกรม "Orange Data Mining" ไม่ใช่
-#   sklearn ล้วน ๆ ที่ pickle/joblib ธรรมดา ดังนั้นตัวโมเดลจะเป็น object
-#   ชนิด Orange.base.Model ซึ่งมี "domain" (โครงสร้างคอลัมน์ที่ใช้ตอนฝึก)
-#   ติดมากับตัวโมเดลเองอยู่แล้ว
+#   Decision Tree) ถูกฝึกและบันทึกด้วยโปรแกรม "Orange Data Mining" โดยตัว
+#   feature ที่ใช้ฝึก (n0, n1, n2, ...) มาจากการแปลงภาพ X-ray ผ่าน widget
+#   "Image Embedding" ด้วยโมเดล embedder ชื่อ "SqueezeNet"
 #
-#   ข้อดีคือ: เราไม่จำเป็นต้องรู้ล่วงหน้าว่ามีคอลัมน์อะไรบ้าง เพราะแอปนี้
-#   จะ "อ่านโครงสร้างคอลัมน์ (domain) จากตัวโมเดลโดยอัตโนมัติ" แล้วสร้าง
-#   ฟอร์มกรอกข้อมูลให้ตรงกับตอนฝึกเสมอ (ไม่ต้อง one-hot encode มือ เพราะ
-#   Orange จัดการ categorical variable ให้เองผ่าน DiscreteVariable)
+#   ดังนั้นตอนทำนายผล (predict) จำเป็นต้องแปลงภาพที่ผู้ใช้อัปโหลดด้วย
+#   embedder ตัวเดียวกัน (SqueezeNet) ก่อนส่งเข้าโมเดลเสมอ ไม่เช่นนั้นตัวเลข
+#   features จะไม่ตรงกับที่โมเดลเรียนรู้ไว้ ผลทำนายจะผิดทันที
 #
-#   ข้อกำหนด: ต้องติดตั้งไลบรารี Orange3 ไว้ในเครื่อง/เซิร์ฟเวอร์ที่รันแอปนี้
-#   ด้วย (ดูไฟล์ requirements.txt) ไม่เช่นนั้น joblib.load จะโหลดไฟล์ .pkcls
-#   ไม่สำเร็จ (จะฟ้อง ModuleNotFoundError: No module named 'Orange')
+#   ข้อกำหนด:
+#   1) ต้องติดตั้งไลบรารี Orange3 และ Orange3-ImageAnalytics (ดู requirements.txt)
+#   2) เครื่อง/เซิร์ฟเวอร์ที่รันแอปนี้ต้องต่ออินเทอร์เน็ตได้ เพราะ ImageEmbedder
+#      ("SqueezeNet") ประมวลผลผ่าน embedding server ระยะไกลของ Orange
+#      (api.garaza.io) ไม่ได้รันในเครื่องเอง ถ้าเซิร์ฟเวอร์นี้ล่มหรือถูกบล็อก
+#      อินเทอร์เน็ตขาออก จะแปลงภาพเป็น embedding ไม่ได้
 # ==============================================================================
 
 import os
 import glob
+import tempfile
 import joblib
 import numpy as np
 import streamlit as st
 
-# พยายาม import Orange (จำเป็นสำหรับ unpickle โมเดล .pkcls)
-# หมายเหตุ: ดักจับ Exception แบบกว้าง (ไม่ใช่แค่ ImportError) แล้วเก็บข้อความ
-# error จริงไว้แสดงผล เพราะบางครั้ง Orange3 อาจ import ไม่สำเร็จด้วยสาเหตุอื่น
-# ที่ไม่ใช่ "ไม่มีไลบรารี" ตรง ๆ (เช่น ขาด dependency ย่อยบางตัว) การเห็น
-# ข้อความ error จริงจะช่วยวินิจฉัยปัญหาได้แม่นยำกว่า
+# พยายาม import Orange + Orange3-ImageAnalytics
 ORANGE_AVAILABLE = False
 ORANGE_IMPORT_ERROR = None
 try:
     import Orange
-    from Orange.data import Table, Domain, ContinuousVariable, DiscreteVariable
+    from Orange.data import Table
+    from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
     ORANGE_AVAILABLE = True
 except Exception as e:
     ORANGE_IMPORT_ERROR = f"{type(e).__name__}: {e}"
@@ -43,34 +42,28 @@ except Exception as e:
 # 2) หัวข้อของแอป
 # ------------------------------------------------------------------------------
 st.set_page_config(page_title="จำแนกโรค Covid-19 จากภาพ X-ray", page_icon="🫁")
-st.title("โปรแกรมจำแนกโรค Covid-19 จากภาพ X-ray")
+st.title("โปรแกรมจำแนกโรค covid จากภาพ x-ray")
 st.caption(
-    "เลือกโมเดลที่ฝึกไว้ล่วงหน้า (.pkcls) จากนั้นกรอกค่าตัวแปรต้น (features) "
-    "แล้วกดปุ่ม 'ทำนายผล' เพื่อดูผลการจำแนก"
+    "อัปโหลดภาพเอกซเรย์ทรวงอก (Chest X-ray) แล้วกดปุ่ม 'ทำนายผล' "
+    "ระบบจะจำแนกว่าภาพเข้าข่าย COVID-19, ปกติ (Normal) หรือ ปอดอักเสบ (Pneumonia)"
 )
 
 if not ORANGE_AVAILABLE:
     st.error(
-        "ไม่สามารถ import ไลบรารี Orange3 ได้ กรุณาติดตั้งก่อนใช้งานด้วยคำสั่ง:\n\n"
+        "ไม่สามารถ import ไลบรารีที่จำเป็นได้ กรุณาติดตั้งก่อนใช้งานด้วยคำสั่ง:\n\n"
         "`pip install -r requirements.txt`\n\n"
-        "(โมเดล .pkcls ในโปรเจกต์นี้ถูกฝึกด้วยโปรแกรม Orange Data Mining "
-        "จึงต้องใช้ไลบรารี Orange3 ในการโหลดโมเดล)"
+        "(ต้องมีทั้ง Orange3 และ Orange3-ImageAnalytics)"
     )
-    # แสดงข้อความ error จริงเพื่อช่วยวินิจฉัยปัญหา (เช่น dependency ที่ขาดหาย)
     st.code(ORANGE_IMPORT_ERROR or "ไม่ทราบสาเหตุ (ไม่มีข้อความ error)")
     st.stop()
 
 # ------------------------------------------------------------------------------
 # 1) ส่วนเลือกโมเดล + โหลดโมเดลด้วย joblib
 # ------------------------------------------------------------------------------
-# โฟลเดอร์ที่เก็บไฟล์โมเดล .pkcls ทั้งหมด (ต้องนำไฟล์ .pkcls ทั้ง 3 ไฟล์
-# ไปวางไว้ในโฟลเดอร์ชื่อ "models" ที่ root ของ repo บน GitHub เดียวกับ app.py)
 MODEL_DIR = "models"
-
-# ค้นหาไฟล์ .pkcls ทั้งหมดในโฟลเดอร์ที่กำหนด
 model_files = sorted(glob.glob(os.path.join(MODEL_DIR, "*.pkcls")))
 
-st.sidebar.header("⚙️ เลือกโมเดล")
+st.sidebar.header("เลือกโมเดล")
 
 if not model_files:
     st.sidebar.error(
@@ -80,12 +73,21 @@ if not model_files:
     )
     st.stop()
 
-# ให้ผู้ใช้เลือกโมเดลจากรายการไฟล์ที่พบในโฟลเดอร์ models/
 model_path = st.sidebar.selectbox(
-    "เลือกไฟล์โมเดลที่ต้องการใช้ทำนาย",
+    "เลือกไฟล์โมเดล (.pkcls)",
     options=model_files,
     format_func=lambda p: os.path.basename(p),
 )
+
+st.sidebar.markdown("**หรืออัปโหลดไฟล์โมเดล (.pkcls)**")
+uploaded_model = st.sidebar.file_uploader(
+    "เลือกไฟล์โมเดล (.pkcls)", type=["pkcls"], label_visibility="collapsed"
+)
+if uploaded_model is not None:
+    tmp_model_path = os.path.join(tempfile.gettempdir(), uploaded_model.name)
+    with open(tmp_model_path, "wb") as f:
+        f.write(uploaded_model.getbuffer())
+    model_path = tmp_model_path
 
 
 @st.cache_resource(show_spinner="กำลังโหลดโมเดล...")
@@ -97,81 +99,91 @@ def load_model(path: str):
 try:
     model = load_model(model_path)
 except Exception as e:
-    st.error(f"โหลดโมเดลไม่สำเร็จ: {e}")
+    st.sidebar.error(f"โหลดโมเดลไม่สำเร็จ: {e}")
     st.stop()
 
 st.sidebar.success(f"โหลดโมเดล '{os.path.basename(model_path)}' สำเร็จ")
 
 # ------------------------------------------------------------------------------
-# 3) สร้างฟอร์มกรอกค่าตัวแปรต้น (features) โดยอ่านจาก domain ของโมเดลอัตโนมัติ
+# 3) ตัว embedder (SqueezeNet) — cache ไว้ ไม่ต้องสร้างใหม่ทุกครั้ง
 # ------------------------------------------------------------------------------
-domain = model.domain  # Orange.data.Domain ที่ติดมากับตัวโมเดล (มาจากตอนฝึก)
+@st.cache_resource(show_spinner=False)
+def get_embedder():
+    # "squeezenet" ต้องตรงกับที่เลือกไว้ตอนฝึกใน widget "Image Embedding" ของ Orange
+    return ImageEmbedder(model="squeezenet")
 
-st.subheader("กรอกค่าตัวแปรต้น (Features)")
-
-# ใช้ st.form เพื่อ "ล็อค" ค่า widget ทั้งหมดไว้ ไม่ให้แอป rerun ทุกครั้งที่
-# ผู้ใช้พิมพ์ตัวเลขหรือเปลี่ยน selectbox — จะ rerun แค่ครั้งเดียวตอนกดปุ่ม
-# "ทำนายผล" เท่านั้น วิธีนี้ช่วยแก้ปัญหา
-# RuntimeError: dictionary changed size during iteration
-# ที่อาจเกิดขึ้นเวลาสร้าง widget แบบวนลูปนอกฟอร์ม
-with st.form("prediction_form"):
-    user_values = {}  # เก็บค่าที่ผู้ใช้กรอก key = ชื่อ attribute, value = ค่าที่แปลงแล้ว (float)
-
-    for attr in domain.attributes:
-        if isinstance(attr, ContinuousVariable):
-            # ตัวแปรตัวเลขต่อเนื่อง -> ใช้ st.number_input
-            val = st.number_input(
-                label=attr.name,
-                value=0.0,
-                format="%.4f",
-                key=f"num_{attr.name}",
-            )
-            user_values[attr.name] = float(val)
-
-        elif isinstance(attr, DiscreteVariable):
-            # ตัวแปรหมวดหมู่ (categorical) -> ใช้ st.selectbox โดยดึงรายการ
-            # ค่าที่เป็นไปได้ (attr.values) มาจากตอนฝึกโมเดลโดยตรง
-            # (Orange จะแปลงข้อความเป็นตัวเลขภายในให้เอง เทียบเท่ากับการทำ
-            #  encoding/one-hot ตอนฝึก จึงไม่ต้อง one-hot ด้วยมืออีกครั้ง)
-            selected_label = st.selectbox(
-                label=attr.name,
-                options=list(attr.values),
-                key=f"sel_{attr.name}",
-            )
-            # แปลงข้อความที่เลือก -> ดัชนี (index) ตามลำดับใน attr.values
-            # เพื่อให้ตรงรูปแบบตัวเลขที่ Orange ใช้ภายใน (เหมือนตอนฝึกโมเดล)
-            user_values[attr.name] = float(attr.values.index(selected_label))
-
-        else:
-            st.warning(f"ไม่รองรับชนิดตัวแปร '{attr.name}' ({type(attr)}) โดยอัตโนมัติ")
-
-    submitted = st.form_submit_button("ทำนายผล", type="primary")
 
 # ------------------------------------------------------------------------------
-# 4) ปุ่ม "ทำนายผล" ถูกกด -> ประมวลผล
+# 4) ส่วนอัปโหลดภาพ X-ray
 # ------------------------------------------------------------------------------
-if submitted:
+st.subheader("อัปโหลดภาพ X-ray")
+
+uploaded_image = st.file_uploader(
+    "เลือกไฟล์ภาพ (jpg, jpeg, png)", type=["jpg", "jpeg", "png"]
+)
+
+if uploaded_image is None:
+    st.info("กรุณาอัปโหลดภาพ X-ray เพื่อเริ่มการทำนาย")
+    st.stop()
+
+st.image(uploaded_image, caption="ภาพที่อัปโหลด", use_container_width=True)
+
+if st.button("ทำนายผล", type="primary"):
+    tmp_image_path = None
     try:
-        # จัดเรียงค่าตามลำดับ attribute เดียวกับตอน domain.attributes ถูกฝึกไว้
-        row = [user_values[attr.name] for attr in domain.attributes]
-        X = np.array([row], dtype=float)
+        # ------------------------------------------------------------------
+        # 4.1) บันทึกภาพลงไฟล์ชั่วคราว เพราะ ImageEmbedder ต้องการ path ของไฟล์
+        # ------------------------------------------------------------------
+        suffix = os.path.splitext(uploaded_image.name)[1] or ".jpg"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+            tmp_file.write(uploaded_image.getbuffer())
+            tmp_image_path = tmp_file.name
 
-        # สร้าง Orange Table จาก domain เดิม (รับประกันว่าคอลัมน์/ลำดับตรงกับตอนฝึก)
+        # ------------------------------------------------------------------
+        # 4.2) แปลงภาพเป็นเวกเตอร์ตัวเลข (embedding) ด้วย SqueezeNet
+        #      ขั้นตอนนี้ต้องต่ออินเทอร์เน็ตได้ (เรียก embedding server ของ Orange)
+        # ------------------------------------------------------------------
+        with st.spinner("กำลังแปลงภาพเป็น embedding (ต้องใช้อินเทอร์เน็ต)..."):
+            embedder = get_embedder()
+            embeddings = embedder([tmp_image_path])
+
+        embedding_vector = embeddings[0] if embeddings is not None else None
+        if embedding_vector is None:
+            st.error(
+                "แปลงภาพเป็น embedding ไม่สำเร็จ "
+                "(อาจเชื่อมต่อ embedding server ไม่ได้ หรือไฟล์ภาพเสียหาย) "
+                "กรุณาลองใหม่อีกครั้ง"
+            )
+            st.stop()
+
+        # ------------------------------------------------------------------
+        # 4.3) สร้าง Orange Table จาก domain เดิมของโมเดล แล้วทำนายผล
+        # ------------------------------------------------------------------
+        domain = model.domain
+        X = np.array([embedding_vector], dtype=float)
+
+        if X.shape[1] != len(domain.attributes):
+            st.error(
+                f"จำนวนมิติของ embedding ({X.shape[1]}) ไม่ตรงกับจำนวน feature "
+                f"ที่โมเดลนี้ฝึกไว้ ({len(domain.attributes)}) "
+                "แสดงว่า embedder ที่ใช้ตอนฝึกอาจไม่ใช่ SqueezeNet "
+                "กรุณาตรวจสอบไฟล์ workflow (.ows) อีกครั้ง"
+            )
+            st.stop()
+
         instance_table = Table.from_numpy(domain, X)
 
-        # ทำนายผล พร้อมความน่าจะเป็นเป็นของแต่ละคลาส
         pred_idx, probs = model(instance_table, ret=Orange.classification.Model.ValueProbs)
 
         class_var = domain.class_var
         predicted_label = class_var.values[int(pred_idx[0])]
         confidence = float(np.max(probs[0])) * 100
 
-        # ------------------------------------------------------------------------
-        # 5) แสดงผลการทำนาย
-        # ------------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # 4.4) แสดงผลการทำนาย
+        # ------------------------------------------------------------------
         st.success(f"ผลการทำนาย: **{predicted_label}** (ความมั่นใจ {confidence:.2f}%)")
 
-        # แสดงความน่าจะเป็นของทุกคลาสแบบละเอียด เพื่อให้อ่านง่ายขึ้น
         st.write("ความน่าจะเป็นของแต่ละคลาส:")
         prob_dict = {
             class_var.values[i]: f"{p * 100:.2f}%"
@@ -181,3 +193,8 @@ if submitted:
 
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาดระหว่างทำนายผล: {e}")
+
+    finally:
+        # ลบไฟล์ชั่วคราวทิ้งเสมอ ไม่ว่าจะสำเร็จหรือ error
+        if tmp_image_path and os.path.exists(tmp_image_path):
+            os.remove(tmp_image_path)
