@@ -1,7 +1,7 @@
 # app.py
-# ============================================================================
+# ==============================================================================
 # โปรแกรมจำแนกโรค Covid-19 จากภาพ X-ray (Streamlit Web App)
-# ----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # หมายเหตุสำคัญ (โปรดอ่านก่อนใช้งาน):
 #   ไฟล์โมเดล .pkcls ทั้ง 3 ไฟล์ที่แนบมา (Logistic Regression, Neural Network,
 #   Decision Tree) ถูกฝึกและบันทึกด้วยโปรแกรม "Orange Data Mining" ไม่ใช่
@@ -17,7 +17,7 @@
 #   ข้อกำหนด: ต้องติดตั้งไลบรารี Orange3 ไว้ในเครื่อง/เซิร์ฟเวอร์ที่รันแอปนี้
 #   ด้วย (ดูไฟล์ requirements.txt) ไม่เช่นนั้น joblib.load จะโหลดไฟล์ .pkcls
 #   ไม่สำเร็จ (จะฟ้อง ModuleNotFoundError: No module named 'Orange')
-# ============================================================================
+# ==============================================================================
 
 import os
 import glob
@@ -39,11 +39,10 @@ try:
 except Exception as e:
     ORANGE_IMPORT_ERROR = f"{type(e).__name__}: {e}"
 
-
-# ----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # 2) หัวข้อของแอป
-# ----------------------------------------------------------------------------
-st.set_page_config(page_title="จำแนกโรค Covid-19 จากภาพ X-ray", page_icon="🩻")
+# ------------------------------------------------------------------------------
+st.set_page_config(page_title="จำแนกโรค Covid-19 จากภาพ X-ray", page_icon="🫁")
 st.title("โปรแกรมจำแนกโรค Covid-19 จากภาพ X-ray")
 st.caption(
     "เลือกโมเดลที่ฝึกไว้ล่วงหน้า (.pkcls) จากนั้นกรอกค่าตัวแปรต้น (features) "
@@ -61,10 +60,9 @@ if not ORANGE_AVAILABLE:
     st.code(ORANGE_IMPORT_ERROR or "ไม่ทราบสาเหตุ (ไม่มีข้อความ error)")
     st.stop()
 
-
-# ----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # 1) ส่วนเลือกโมเดล + โหลดโมเดลด้วย joblib
-# ----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # โฟลเดอร์ที่เก็บไฟล์โมเดล .pkcls ทั้งหมด (ต้องนำไฟล์ .pkcls ทั้ง 3 ไฟล์
 # ไปวางไว้ในโฟลเดอร์ชื่อ "models" ที่ root ของ repo บน GitHub เดียวกับ app.py)
 MODEL_DIR = "models"
@@ -104,49 +102,55 @@ except Exception as e:
 
 st.sidebar.success(f"โหลดโมเดล '{os.path.basename(model_path)}' สำเร็จ")
 
-
-# ----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # 3) สร้างฟอร์มกรอกค่าตัวแปรต้น (features) โดยอ่านจาก domain ของโมเดลอัตโนมัติ
-# ----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 domain = model.domain  # Orange.data.Domain ที่ติดมากับตัวโมเดล (มาจากตอนฝึก)
 
 st.subheader("กรอกค่าตัวแปรต้น (Features)")
 
-user_values = {}  # เก็บค่าที่ผู้ใช้กรอก key = ชื่อ attribute, value = ค่าที่แปลงแล้ว (float)
+# ใช้ st.form เพื่อ "ล็อค" ค่า widget ทั้งหมดไว้ ไม่ให้แอป rerun ทุกครั้งที่
+# ผู้ใช้พิมพ์ตัวเลขหรือเปลี่ยน selectbox — จะ rerun แค่ครั้งเดียวตอนกดปุ่ม
+# "ทำนายผล" เท่านั้น วิธีนี้ช่วยแก้ปัญหา
+# RuntimeError: dictionary changed size during iteration
+# ที่อาจเกิดขึ้นเวลาสร้าง widget แบบวนลูปนอกฟอร์ม
+with st.form("prediction_form"):
+    user_values = {}  # เก็บค่าที่ผู้ใช้กรอก key = ชื่อ attribute, value = ค่าที่แปลงแล้ว (float)
 
-for attr in domain.attributes:
-    if isinstance(attr, ContinuousVariable):
-        # ตัวแปรตัวเลขต่อเนื่อง -> ใช้ st.number_input
-        val = st.number_input(
-            label=attr.name,
-            value=0.0,
-            format="%.4f",
-            key=f"num_{attr.name}",
-        )
-        user_values[attr.name] = float(val)
+    for attr in domain.attributes:
+        if isinstance(attr, ContinuousVariable):
+            # ตัวแปรตัวเลขต่อเนื่อง -> ใช้ st.number_input
+            val = st.number_input(
+                label=attr.name,
+                value=0.0,
+                format="%.4f",
+                key=f"num_{attr.name}",
+            )
+            user_values[attr.name] = float(val)
 
-    elif isinstance(attr, DiscreteVariable):
-        # ตัวแปรหมวดหมู่ (categorical) -> ใช้ st.selectbox โดยดึงรายการ
-        # ค่าที่เป็นไปได้ (attr.values) มาจากตอนฝึกโมเดลโดยตรง
-        # (Orange จะแปลงข้อความเป็นตัวเลขภายในให้เอง เทียบเท่ากับการทำ
-        #  encoding/one-hot ตอนฝึก จึงไม่ต้อง one-hot ด้วยมืออีกครั้ง)
-        selected_label = st.selectbox(
-            label=attr.name,
-            options=list(attr.values),
-            key=f"sel_{attr.name}",
-        )
-        # แปลงข้อความที่เลือก -> ดัชนี (index) ตามลำดับใน attr.values
-        # เพื่อให้ตรงรูปแบบตัวเลขที่ Orange ใช้ภายใน (เหมือนตอนฝึกโมเดล)
-        user_values[attr.name] = float(attr.values.index(selected_label))
+        elif isinstance(attr, DiscreteVariable):
+            # ตัวแปรหมวดหมู่ (categorical) -> ใช้ st.selectbox โดยดึงรายการ
+            # ค่าที่เป็นไปได้ (attr.values) มาจากตอนฝึกโมเดลโดยตรง
+            # (Orange จะแปลงข้อความเป็นตัวเลขภายในให้เอง เทียบเท่ากับการทำ
+            #  encoding/one-hot ตอนฝึก จึงไม่ต้อง one-hot ด้วยมืออีกครั้ง)
+            selected_label = st.selectbox(
+                label=attr.name,
+                options=list(attr.values),
+                key=f"sel_{attr.name}",
+            )
+            # แปลงข้อความที่เลือก -> ดัชนี (index) ตามลำดับใน attr.values
+            # เพื่อให้ตรงรูปแบบตัวเลขที่ Orange ใช้ภายใน (เหมือนตอนฝึกโมเดล)
+            user_values[attr.name] = float(attr.values.index(selected_label))
 
-    else:
-        st.warning(f"ไม่รองรับชนิดตัวแปร '{attr.name}' ({type(attr)}) โดยอัตโนมัติ")
+        else:
+            st.warning(f"ไม่รองรับชนิดตัวแปร '{attr.name}' ({type(attr)}) โดยอัตโนมัติ")
 
+    submitted = st.form_submit_button("ทำนายผล", type="primary")
 
-# ----------------------------------------------------------------------------
-# 4) ปุ่ม "ทำนายผล"
-# ----------------------------------------------------------------------------
-if st.button("ทำนายผล", type="primary"):
+# ------------------------------------------------------------------------------
+# 4) ปุ่ม "ทำนายผล" ถูกกด -> ประมวลผล
+# ------------------------------------------------------------------------------
+if submitted:
     try:
         # จัดเรียงค่าตามลำดับ attribute เดียวกับตอน domain.attributes ถูกฝึกไว้
         row = [user_values[attr.name] for attr in domain.attributes]
@@ -155,16 +159,16 @@ if st.button("ทำนายผล", type="primary"):
         # สร้าง Orange Table จาก domain เดิม (รับประกันว่าคอลัมน์/ลำดับตรงกับตอนฝึก)
         instance_table = Table.from_numpy(domain, X)
 
-        # ทำนายผล พร้อมความน่าจะเป็นของแต่ละคลาส
+        # ทำนายผล พร้อมความน่าจะเป็นเป็นของแต่ละคลาส
         pred_idx, probs = model(instance_table, ret=Orange.classification.Model.ValueProbs)
 
         class_var = domain.class_var
         predicted_label = class_var.values[int(pred_idx[0])]
         confidence = float(np.max(probs[0])) * 100
 
-        # ----------------------------------------------------------------
+        # ------------------------------------------------------------------------
         # 5) แสดงผลการทำนาย
-        # ----------------------------------------------------------------
+        # ------------------------------------------------------------------------
         st.success(f"ผลการทำนาย: **{predicted_label}** (ความมั่นใจ {confidence:.2f}%)")
 
         # แสดงความน่าจะเป็นของทุกคลาสแบบละเอียด เพื่อให้อ่านง่ายขึ้น
