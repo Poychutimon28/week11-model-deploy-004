@@ -65,9 +65,8 @@ if not ORANGE_AVAILABLE:
 # ----------------------------------------------------------------------------
 # 1) ส่วนเลือกโมเดล + โหลดโมเดลด้วย joblib
 # ----------------------------------------------------------------------------
-# โฟลเดอร์ที่เก็บไฟล์โมเดล .pkcls ทั้งหมด (แก้ path ตรงนี้ตามที่เก็บไฟล์จริง
-# เช่น ถ้าดาวน์โหลดโฟลเดอร์ "Model" จาก Google Drive มาไว้ข้าง ๆ app.py
-# ให้ตั้งเป็น "Model" หรือถ้าอยู่โฟลเดอร์เดียวกับ app.py ให้ตั้งเป็น ".")
+# โฟลเดอร์ที่เก็บไฟล์โมเดล .pkcls ทั้งหมด (ต้องนำไฟล์ .pkcls ทั้ง 3 ไฟล์
+# ไปวางไว้ในโฟลเดอร์ชื่อ "models" ที่ root ของ repo บน GitHub เดียวกับ app.py)
 MODEL_DIR = "models"
 
 # ค้นหาไฟล์ .pkcls ทั้งหมดในโฟลเดอร์ที่กำหนด
@@ -75,31 +74,20 @@ model_files = sorted(glob.glob(os.path.join(MODEL_DIR, "*.pkcls")))
 
 st.sidebar.header("⚙️ เลือกโมเดล")
 
-uploaded_model = st.sidebar.file_uploader(
-    "หรืออัปโหลดไฟล์โมเดล .pkcls เอง (ถ้าไม่พบไฟล์ในโฟลเดอร์ models/)",
-    type=["pkcls"],
-)
-
-model_path = None
-if uploaded_model is not None:
-    # เขียนไฟล์ที่อัปโหลดลงดิสก์ชั่วคราว แล้วค่อยโหลดด้วย joblib
-    temp_path = os.path.join("_uploaded_model.pkcls")
-    with open(temp_path, "wb") as f:
-        f.write(uploaded_model.getbuffer())
-    model_path = temp_path
-elif model_files:
-    # ให้ผู้ใช้เลือกโมเดลจากรายการไฟล์ที่พบในโฟลเดอร์ models/
-    model_choice = st.sidebar.selectbox(
-        "เลือกไฟล์โมเดลที่ต้องการใช้ทำนาย",
-        options=model_files,
-        format_func=lambda p: os.path.basename(p),
-    )
-    model_path = model_choice
-else:
-    st.sidebar.warning(
+if not model_files:
+    st.sidebar.error(
         f"ไม่พบไฟล์ .pkcls ในโฟลเดอร์ '{MODEL_DIR}/' "
-        "กรุณาวางไฟล์โมเดลไว้ในโฟลเดอร์นี้ หรืออัปโหลดไฟล์ด้านบนแทน"
+        "กรุณานำไฟล์โมเดล (.pkcls) ไปวางไว้ในโฟลเดอร์นี้บน GitHub repo "
+        "แล้ว deploy ใหม่อีกครั้ง"
     )
+    st.stop()
+
+# ให้ผู้ใช้เลือกโมเดลจากรายการไฟล์ที่พบในโฟลเดอร์ models/
+model_path = st.sidebar.selectbox(
+    "เลือกไฟล์โมเดลที่ต้องการใช้ทำนาย",
+    options=model_files,
+    format_func=lambda p: os.path.basename(p),
+)
 
 
 @st.cache_resource(show_spinner="กำลังโหลดโมเดล...")
@@ -107,10 +95,6 @@ def load_model(path: str):
     """โหลดโมเดล Orange (.pkcls) ด้วย joblib และ cache ไว้ไม่ให้โหลดซ้ำทุกครั้ง"""
     return joblib.load(path)
 
-
-if model_path is None:
-    st.info("กรุณาเลือกหรืออัปโหลดไฟล์โมเดล (.pkcls) ก่อน จึงจะเริ่มกรอกข้อมูลได้")
-    st.stop()
 
 try:
     model = load_model(model_path)
