@@ -1,0 +1,12 @@
+# requirements.txt
+# ไลบรารีที่จำเป็นสำหรับรันเว็บแอป app.py
+streamlit==1.38.0
+scikit-learn==1.5.1
+pandas==2.2.2
+joblib==1.4.2
+numpy==1.26.4
+
+# สำคัญ: โมเดล .pkcls ทั้ง 3 ไฟล์ถูกฝึกด้วยโปรแกรม Orange Data Mining
+# จึงจำเป็นต้องติดตั้ง Orange3 ด้วย มิฉะนั้น joblib.load จะโหลดไฟล์โมเดล
+# ไม่สำเร็จ (ModuleNotFoundError: No module named 'Orange')
+Orange3==3.36.2
