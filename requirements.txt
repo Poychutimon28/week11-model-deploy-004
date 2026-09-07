@@ -10,7 +10,7 @@ streamlit>=1.38.0
 scikit-learn==1.3.2
 pandas>=2.0.0
 joblib>=1.3.0
-numpy>=1.24.0,<2.0.0
+numpy
 
 # สำคัญ: โมเดล .pkcls ทั้ง 3 ไฟล์ถูกฝึกด้วยโปรแกรม Orange Data Mining
 # จึงจำเป็นต้องติดตั้ง Orange3 ด้วย มิฉะนั้น joblib.load จะโหลดไฟล์โมเดล
