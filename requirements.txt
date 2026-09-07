@@ -2,7 +2,7 @@
 # ไลบรารีที่จำเป็นสำหรับรันเว็บแอป app.py
 #
 # หมายเหตุ: Orange3==3.36.2 บังคับให้ scikit-learn ต้องอยู่ในช่วง
-# >=1.3.dev0,<1.4 เท่านั้น (หากใช้ 1.4 ขึ้นไป มิฉะนั้น pip/uv จะ resolve
+# >=1.3.dev0,<1.4 เท่านั้น (ห้ามใช้ 1.4 ขึ้นไป มิฉะนั้น pip/uv จะ resolve
 # dependency ไม่ได้ และ deploy fail แบบที่เจอ error
 # "No solution found when resolving dependencies")
 # จึงต้องปักหมุด scikit-learn เป็น 1.3.2 ให้ตรงกับช่วงที่ Orange3 รองรับ
@@ -11,17 +11,11 @@ scikit-learn==1.3.2
 pandas>=2.0.0
 joblib>=1.3.0
 numpy>=1.24.0,<2.0.0
-pillow>=9.0.0
 
 # สำคัญ: โมเดล .pkcls ทั้ง 3 ไฟล์ถูกฝึกด้วยโปรแกรม Orange Data Mining
-# จึงจำเป็นต้องติดตั้ง Orange3 ด้วย มิฉะนั้น joblib.load จะโหลดโมเดล
+# จึงจำเป็นต้องติดตั้ง Orange3 ด้วย มิฉะนั้น joblib.load จะโหลดไฟล์โมเดล
 # ไม่สำเร็จ (ModuleNotFoundError: No module named 'Orange')
 Orange3==3.36.2
-
-# จำเป็น: feature ที่ใช้ฝึกโมเดล (n0, n1, n2, ...) มาจากการแปลงภาพ X-ray
-# ผ่าน widget "Image Embedding" (SqueezeNet) ของ Orange
-# ถ้าไม่ติดตั้ง add-on นี้ จะ import ImageEmbedder ไม่ได้
-Orange3-ImageAnalytics>=0.10.0
 
 # Orange3 เรียกใช้ pkg_resources (มากับ setuptools) ตอน import เพื่อจัดการ
 # ระบบ add-on ของมัน แต่ setuptools ตั้งแต่เวอร์ชัน 82.0.0 เป็นต้นไป
@@ -30,12 +24,10 @@ Orange3-ImageAnalytics>=0.10.0
 # มิฉะนั้นจะเจอ ModuleNotFoundError: No module named 'pkg_resources'
 setuptools>=68.0.0,<81
 
-# จำเป็น: Orange3 / Orange3-ImageAnalytics ใช้ระบบ AnyQt ในการรองรับ Qt GUI
-# ของโปรแกรม Orange Canvas แม้เว็บแอปนี้จะไม่เปิดหน้าต่าง GUI ใด ๆ เลยก็ตาม
-# แต่ตอน import โมดูล (เช่น ImageEmbedder) มันจะเช็คหา Qt binding เสมอ
-# ถ้าไม่มีติดตั้งไว้จะเจอ ImportError:
-# "PyQt4, PyQt5, PySide or PySide2 are not available for import"
-# จึงต้องติดตั้ง PyQt5 ไว้ (แม้จะไม่ได้ใช้ GUI จริง ๆ) คู่กับไฟล์ packages.txt
-# ที่เพิ่ม system libraries ที่ PyQt5 ต้องใช้ตอนรันบนเซิร์ฟเวอร์ที่ไม่มีจอ
-PyQt5==5.15.11
-PyQtWebEngine==5.15.7
+# Orange3-ImageAnalytics: เพิ่มเข้ามาเพราะโมเดลถูกฝึกจากภาพ X-ray ผ่าน widget
+# "Image Analytics" (SqueezeNet embedding) ใน Orange จึงต้องใช้ไลบรารีนี้
+# แปลงภาพที่ผู้ใช้อัปโหลดให้เป็นตัวเลข (embedding vector) ชุดเดียวกับตอนฝึก
+# ก่อนส่งเข้าโมเดล ตัว SqueezeNet ทำงานในเครื่องได้เลย (ไม่ต้องพึ่งอินเทอร์เน็ต
+# ระหว่างทำนาย) แต่ครั้งแรกที่ใช้งานอาจต้องดาวน์โหลดไฟล์น้ำหนักโมเดลก่อน
+Orange3-ImageAnalytics>=0.13.0
+Pillow>=10.0.0
