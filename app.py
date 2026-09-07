@@ -26,12 +26,18 @@ import numpy as np
 import streamlit as st
 
 # พยายาม import Orange (จำเป็นสำหรับ unpickle โมเดล .pkcls)
+# หมายเหตุ: ดักจับ Exception แบบกว้าง (ไม่ใช่แค่ ImportError) แล้วเก็บข้อความ
+# error จริงไว้แสดงผล เพราะบางครั้ง Orange3 อาจ import ไม่สำเร็จด้วยสาเหตุอื่น
+# ที่ไม่ใช่ "ไม่มีไลบรารี" ตรง ๆ (เช่น ขาด dependency ย่อยบางตัว) การเห็น
+# ข้อความ error จริงจะช่วยวินิจฉัยปัญหาได้แม่นยำกว่า
+ORANGE_AVAILABLE = False
+ORANGE_IMPORT_ERROR = None
 try:
     import Orange
     from Orange.data import Table, Domain, ContinuousVariable, DiscreteVariable
     ORANGE_AVAILABLE = True
-except ImportError:
-    ORANGE_AVAILABLE = False
+except Exception as e:
+    ORANGE_IMPORT_ERROR = f"{type(e).__name__}: {e}"
 
 
 # ----------------------------------------------------------------------------
@@ -46,11 +52,13 @@ st.caption(
 
 if not ORANGE_AVAILABLE:
     st.error(
-        "ไม่พบไลบรารี Orange3 ในเครื่อง กรุณาติดตั้งก่อนใช้งานด้วยคำสั่ง:\n\n"
+        "ไม่สามารถ import ไลบรารี Orange3 ได้ กรุณาติดตั้งก่อนใช้งานด้วยคำสั่ง:\n\n"
         "`pip install -r requirements.txt`\n\n"
         "(โมเดล .pkcls ในโปรเจกต์นี้ถูกฝึกด้วยโปรแกรม Orange Data Mining "
         "จึงต้องใช้ไลบรารี Orange3 ในการโหลดโมเดล)"
     )
+    # แสดงข้อความ error จริงเพื่อช่วยวินิจฉัยปัญหา (เช่น dependency ที่ขาดหาย)
+    st.code(ORANGE_IMPORT_ERROR or "ไม่ทราบสาเหตุ (ไม่มีข้อความ error)")
     st.stop()
 
 
