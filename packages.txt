@@ -1,5 +1,0 @@
-libgl1
-libegl1
-libxkbcommon0
-libxcb-cursor0
-libdbus-1-3
