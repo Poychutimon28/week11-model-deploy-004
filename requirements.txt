@@ -29,3 +29,13 @@ Orange3-ImageAnalytics>=0.10.0
 # จึงต้องปักเพดานเวอร์ชันไว้ที่ <81 เพื่อให้ยังมี pkg_resources ใช้งานได้
 # มิฉะนั้นจะเจอ ModuleNotFoundError: No module named 'pkg_resources'
 setuptools>=68.0.0,<81
+
+# จำเป็น: Orange3 / Orange3-ImageAnalytics ใช้ระบบ AnyQt ในการรองรับ Qt GUI
+# ของโปรแกรม Orange Canvas แม้เว็บแอปนี้จะไม่เปิดหน้าต่าง GUI ใด ๆ เลยก็ตาม
+# แต่ตอน import โมดูล (เช่น ImageEmbedder) มันจะเช็คหา Qt binding เสมอ
+# ถ้าไม่มีติดตั้งไว้จะเจอ ImportError:
+# "PyQt4, PyQt5, PySide or PySide2 are not available for import"
+# จึงต้องติดตั้ง PyQt5 ไว้ (แม้จะไม่ได้ใช้ GUI จริง ๆ) คู่กับไฟล์ packages.txt
+# ที่เพิ่ม system libraries ที่ PyQt5 ต้องใช้ตอนรันบนเซิร์ฟเวอร์ที่ไม่มีจอ
+PyQt5==5.15.11
+PyQtWebEngine==5.15.7

@@ -21,6 +21,12 @@
 # ==============================================================================
 
 import os
+
+# บังคับให้ Qt (ที่ Orange3 ต้องใช้ผ่าน PyQt5 ตอน import) รันแบบ "offscreen"
+# เพราะเซิร์ฟเวอร์ Streamlit Cloud ไม่มีจอแสดงผลจริง ต้องตั้งค่านี้ก่อน import
+# Orange/PyQt5 ใด ๆ ไม่เช่นนั้นอาจเจอ error เกี่ยวกับการเปิดหน้าต่าง GUI
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 import glob
 import tempfile
 import joblib

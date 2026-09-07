@@ -1,0 +1,10 @@
+# packages.txt
+# Streamlit Community Cloud จะอ่านไฟล์นี้แล้ว "apt-get install" ให้อัตโนมัติ
+# ก่อนติดตั้ง requirements.txt — จำเป็นสำหรับให้ PyQt5 (ที่ Orange3 /
+# Orange3-ImageAnalytics ต้องใช้ตอน import แม้ไม่มี GUI จริง) โหลดได้บน
+# เซิร์ฟเวอร์ที่ไม่มีจอแสดงผล (headless) โดยไม่ error
+libgl1
+libegl1
+libxkbcommon0
+libxcb-cursor0
+libdbus-1-3
