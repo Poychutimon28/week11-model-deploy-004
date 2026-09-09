@@ -192,8 +192,21 @@ if st.button("ทำนายผล", type="primary"):
         n_class_vars = len(domain.class_vars) if domain.class_vars else 0
         Y = np.full((X.shape[0], n_class_vars), np.nan) if n_class_vars else None
 
+        # เช่นเดียวกับคอลัมน์คลาส โดเมนของโมเดลที่ฝึกจาก Image Analytics
+        # มักมีคอลัมน์ meta ติดมาด้วย (เช่น ชื่อไฟล์ภาพ/พาธรูปภาพต้นฉบับ)
+        # ต้องใส่ placeholder ให้ครบตามจำนวน มิฉะนั้นจะเจอ error
+        # "Invalid number of meta attribute columns" เช่นกัน
+        n_metas = len(domain.metas) if domain.metas else 0
+        if n_metas:
+            # สร้าง array ชนิด object แล้วใส่ค่าว่าง/NaN ตามชนิดตัวแปรแต่ละคอลัมน์
+            metas_arr = np.empty((X.shape[0], n_metas), dtype=object)
+            for j, meta_var in enumerate(domain.metas):
+                metas_arr[:, j] = "" if meta_var.is_string else np.nan
+        else:
+            metas_arr = None
+
         # สร้าง Orange Table จาก domain เดิม (รับประกันว่าคอลัมน์/ลำดับตรงกับตอนฝึก)
-        instance_table = Table.from_numpy(domain, X, Y)
+        instance_table = Table.from_numpy(domain, X, Y, metas=metas_arr)
 
         # ทำนายผล พร้อมความน่าจะเป็นของแต่ละคลาส
         pred_idx, probs = model(instance_table, ret=Orange.classification.Model.ValueProbs)
