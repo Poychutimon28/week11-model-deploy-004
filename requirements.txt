@@ -29,3 +29,10 @@ Pillow>=10.0.0
 # จึงต้องปักเพดานเวอร์ชันไว้ที่ <81 เพื่อให้ยังมี pkg_resources ใช้งานได้
 # มิฉะนั้นจะเจอ ModuleNotFoundError: No module named 'pkg_resources'
 setuptools<81
+
+# Orange3-ImageAnalytics ผูกกับ Qt (ผ่านไลบรารี AnyQt) อยู่ภายใน แม้ตอน
+# ใช้งานแบบ scripting (ไม่เปิดหน้าต่าง GUI) ก็ยังต้องมี Qt binding ติดตั้ง
+# อยู่ในเครื่อง มิฉะนั้นจะเจอ "ImportError: PyQt4, PyQt5, PySide or PySide2
+# are not available for import" จึงต้องติดตั้ง PyQt5 เพิ่ม (ดูไฟล์
+# packages.txt คู่กันสำหรับ system libraries ที่ PyQt5 ต้องใช้ด้วย)
+PyQt5

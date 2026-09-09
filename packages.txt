@@ -1,0 +1,27 @@
+# packages.txt
+# System-level (apt) packages ที่ Streamlit Cloud จะติดตั้งให้อัตโนมัติ
+# ก่อนติดตั้ง Python packages ใน requirements.txt
+#
+# จำเป็นสำหรับ PyQt5 ให้ import ได้แบบ headless (ไม่มีจอแสดงผล) เพราะ
+# Orange3-ImageAnalytics ต้องพึ่ง Qt binding (ผ่าน AnyQt) แม้ใช้งานแบบ
+# scripting ก็ตาม หากไม่มี libraries เหล่านี้ PyQt5 จะโหลดไม่สำเร็จ
+# (error ประมาณ "libGL.so.1: cannot open shared object file")
+libgl1
+libegl1
+libxkbcommon0
+libdbus-1-3
+libnss3
+libnspr4
+libxcomposite1
+libxrandr2
+libxi6
+libxcursor1
+libxdamage1
+libxtst6
+libatk1.0-0
+libatk-bridge2.0-0
+libcups2
+libxrender1
+libxext6
+libsm6
+libfontconfig1
