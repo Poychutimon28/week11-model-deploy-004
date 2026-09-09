@@ -1,33 +1,31 @@
 # requirements.txt
 # ไลบรารีที่จำเป็นสำหรับรันเว็บแอป app.py
 #
-# หมายเหตุ: Orange3==3.36.2 บังคับให้ scikit-learn ต้องอยู่ในช่วง
-# >=1.3.dev0,<1.4 เท่านั้น (ห้ามใช้ 1.4 ขึ้นไป มิฉะนั้น pip/uv จะ resolve
-# dependency ไม่ได้ และ deploy fail แบบที่เจอ error
-# "No solution found when resolving dependencies")
-# จึงต้องปักหมุด scikit-learn เป็น 1.3.2 ให้ตรงกับช่วงที่ Orange3 รองรับ
-streamlit>=1.38.0
-scikit-learn==1.3.2
-pandas>=2.0.0
-joblib>=1.3.0
-numpy>=1.24.0,<2.0.0
+# หมายเหตุสำคัญ: เดิมเคยปักหมุดเวอร์ชันของ scikit-learn / Orange3 /
+# Orange3-ImageAnalytics ไว้ตายตัว แต่พบว่าแต่ละแพ็กเกจมีข้อกำหนด
+# (dependency) เกี่ยวโยงกันเองอยู่แล้ว (เช่น Orange3 บังคับช่วงของ
+# scikit-learn และ orange-canvas-core, Orange3-ImageAnalytics ก็บังคับ
+# ช่วงของ orange-canvas-core เช่นกัน) การปักหมุดตายตัวทำให้ pip/uv
+# resolve dependency ไม่ได้บ่อยครั้ง ("No solution found...")
+#
+# จึงเปลี่ยนมาระบุแค่ "ขอบเขตล่าง" (>=) ของแพ็กเกจหลักที่แอปเรียกใช้ตรง ๆ
+# แล้วปล่อยให้ pip/uv เลือกเวอร์ชันที่เข้ากันได้ทั้งหมดให้เองโดยอัตโนมัติ
+# ซึ่งแม่นยำกว่าการเดาปักหมุดเองทีละตัว
 
-# สำคัญ: โมเดล .pkcls ทั้ง 3 ไฟล์ถูกฝึกด้วยโปรแกรม Orange Data Mining
-# จึงจำเป็นต้องติดตั้ง Orange3 ด้วย มิฉะนั้น joblib.load จะโหลดไฟล์โมเดล
-# ไม่สำเร็จ (ModuleNotFoundError: No module named 'Orange')
-Orange3==3.36.2
+streamlit>=1.38.0
+joblib>=1.3.0
+
+# โมเดล .pkcls ทั้ง 3 ไฟล์ถูกฝึกด้วยโปรแกรม Orange Data Mining จึงต้องใช้
+# Orange3 ในการโหลดโมเดล (มิฉะนั้นจะเจอ ModuleNotFoundError: No module
+# named 'Orange') และต้องใช้ Orange3-ImageAnalytics เพื่อแปลงภาพ X-ray
+# ที่ผู้ใช้อัปโหลดให้เป็น embedding vector (SqueezeNet) แบบเดียวกับตอนฝึก
+Orange3
+Orange3-ImageAnalytics
+Pillow>=10.0.0
 
 # Orange3 เรียกใช้ pkg_resources (มากับ setuptools) ตอน import เพื่อจัดการ
 # ระบบ add-on ของมัน แต่ setuptools ตั้งแต่เวอร์ชัน 82.0.0 เป็นต้นไป
 # (ออกเมื่อ ก.พ. 2026) ได้ลบโมดูล pkg_resources ออกไปแล้วอย่างสมบูรณ์
 # จึงต้องปักเพดานเวอร์ชันไว้ที่ <81 เพื่อให้ยังมี pkg_resources ใช้งานได้
 # มิฉะนั้นจะเจอ ModuleNotFoundError: No module named 'pkg_resources'
-setuptools>=68.0.0,<81
-
-# Orange3-ImageAnalytics: เพิ่มเข้ามาเพราะโมเดลถูกฝึกจากภาพ X-ray ผ่าน widget
-# "Image Analytics" (SqueezeNet embedding) ใน Orange จึงต้องใช้ไลบรารีนี้
-# แปลงภาพที่ผู้ใช้อัปโหลดให้เป็นตัวเลข (embedding vector) ชุดเดียวกับตอนฝึก
-# ก่อนส่งเข้าโมเดล ตัว SqueezeNet ทำงานในเครื่องได้เลย (ไม่ต้องพึ่งอินเทอร์เน็ต
-# ระหว่างทำนาย) แต่ครั้งแรกที่ใช้งานอาจต้องดาวน์โหลดไฟล์น้ำหนักโมเดลก่อน
-Orange3-ImageAnalytics>=0.13.0
-Pillow>=10.0.0
+setuptools<81
