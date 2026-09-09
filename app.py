@@ -185,8 +185,15 @@ if st.button("ทำนายผล", type="primary"):
         row = list(embedding_vector)
         X = np.array([row], dtype=float)
 
+        # สร้างคอลัมน์คลาส (Y) เป็นค่า "ไม่ทราบค่า" (NaN) เพราะตอนทำนาย
+        # เรายังไม่รู้คำตอบจริง แต่ Orange ต้องการให้ระบุจำนวนคอลัมน์คลาส
+        # ให้ตรงกับ domain เสมอ (แม้ค่าจะเป็น NaN ก็ตาม) มิฉะนั้นจะเจอ
+        # error "Invalid number of class columns"
+        n_class_vars = len(domain.class_vars) if domain.class_vars else 0
+        Y = np.full((X.shape[0], n_class_vars), np.nan) if n_class_vars else None
+
         # สร้าง Orange Table จาก domain เดิม (รับประกันว่าคอลัมน์/ลำดับตรงกับตอนฝึก)
-        instance_table = Table.from_numpy(domain, X)
+        instance_table = Table.from_numpy(domain, X, Y)
 
         # ทำนายผล พร้อมความน่าจะเป็นของแต่ละคลาส
         pred_idx, probs = model(instance_table, ret=Orange.classification.Model.ValueProbs)
